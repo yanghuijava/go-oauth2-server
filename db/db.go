@@ -13,6 +13,10 @@ func Close() {
 	db.Close()
 }
 
+func GetDb() *gorm.DB {
+	return db
+}
+
 func init() {
 	d, err := gorm.Open("mysql", "root:123456@(10.100.0.116:30113)/oauth2-server?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {

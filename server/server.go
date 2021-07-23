@@ -18,6 +18,7 @@ func Run() {
 	router := gin.Default()
 	router.LoadHTMLGlob("templates/*")
 
+	router.Use(panicMiddleware)
 	router.Use(loginMiddleware)
 
 	web.NewHelloRoute().RegisterRoutes(router)
@@ -44,6 +45,15 @@ func Run() {
 		log.Fatal("Server Shutdown:", err)
 	}
 	logrus.Info("Server exiting")
+}
+
+func panicMiddleware(c *gin.Context) {
+	defer func() {
+		if err := recover(); err != nil {
+			c.JSON(200, err)
+		}
+	}()
+	c.Next()
 }
 
 func loginMiddleware(c *gin.Context) {
