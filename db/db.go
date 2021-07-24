@@ -9,15 +9,17 @@ import (
 var db *gorm.DB
 
 func Close() {
-	logrus.Info("关闭数据连接")
-	db.Close()
+	if db != nil {
+		logrus.Info("关闭数据连接")
+		db.Close()
+	}
 }
 
 func GetDb() *gorm.DB {
 	return db
 }
 
-func init() {
+func InitDb() {
 	d, err := gorm.Open("mysql", "root:123456@(10.100.0.116:30113)/oauth2-server?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
 		panic(err)

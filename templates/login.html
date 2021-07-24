@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>oauth2</title>
+</head>
+<body>
+    <div>
+        <form action="/oauth/executeLogin.html?{{.query}}" method="post" enctype="x-www-form-urlencoded">
+            用户名：<input  type="text"  name="name"/>
+            密码: <input type="password" name="password">
+            <input type="submit" value="Submit">
+        </form>
+    </div>
+    <div>{{.msg}}</div>
+</body>
+</html>

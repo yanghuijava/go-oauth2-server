@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>oauth2</title>
+</head>
+<body>
+    <h3>授权页面</h3>
+    <input type="button" value="退出" onclick="javascrtpt:window.location.href='/oauth/logout.html'">
+    <hr/>
+    <form id="form" action="/oauth/authorize?{{.query}}" method="post" enctype="x-www-form-urlencoded">
+        scope：<input type="radio"name="scope" value="all" checked>all
+        <input type="hidden" name="action" id="action">
+        <input type="submit" value="同意" onclick="agree()">
+        <input type="submit" value="拒绝" onclick="deny()">
+    </form>
+    <script type="text/javascript">
+        function agree(){
+            document.getElementById("action").value = 0;
+            document.getElementById("form").submit();
+        }
+        function deny(){
+            document.getElementById("action").value = 1;
+            document.getElementById("form").submit();
+        }
+    </script>
+</body>
+</html>
