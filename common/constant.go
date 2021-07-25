@@ -31,6 +31,8 @@ const (
 	DB_ERROR              ResultCode = 100013
 	CLIENT_NOT_SUPPORT    ResultCode = 100014
 	USER_NOT_AUTH         ResultCode = 100015
+	TOKEN_INVALID         ResultCode = 100016
+	TOKEN_EMPTY           ResultCode = 100017
 )
 
 func (code ResultCode) GetCode() int {
@@ -73,6 +75,10 @@ func (code ResultCode) GetDesc() string {
 		return "当前客户端不支持的授权模式"
 	case USER_NOT_AUTH:
 		return "用户未授权"
+	case TOKEN_EMPTY:
+		return "token不能为空"
+	case TOKEN_INVALID:
+		return "token无效"
 	default:
 		return "未知"
 	}

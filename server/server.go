@@ -48,11 +48,12 @@ func Run() {
 	accessRefreshTokenDao := &dao.AccessRefreshTokenDaoImpl{}
 
 	//初始化service
-	userService := service.NewOauthUserServiceImpl(userDao)
+	userService := service.NewOauthUserServiceImpl(userDao, accessRefreshTokenDao)
 	authorizeService := service.NewOauthAuthorizeServiceImpl(clientDetailDao, codeDao, accessRefreshTokenDao)
 	//注册路由
 	web.NewLoginRoute(userService).RegisterRoutes(router)
 	web.NewOauthAuthorizeRoutes(authorizeService).RegisterRoutes(router)
+	web.NewUserInfoRoute(userService).RegisterRoutes(router)
 
 	srv := &http.Server{
 		Addr:    ":8080",
@@ -89,7 +90,7 @@ func panicMiddleware(c *gin.Context) {
 }
 
 //白名单不进行拦截
-var whiteList = &[]string{"/oauth/login.html", "/oauth/executeLogin.html", "/oauth/access/token"}
+var whiteList = &[]string{"/oauth/login.html", "/oauth/executeLogin.html", "/oauth/access/token", "/user/userinfo"}
 
 func loginMiddleware(c *gin.Context) {
 	session := sessions.Default(c)

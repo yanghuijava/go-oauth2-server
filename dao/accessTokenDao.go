@@ -10,6 +10,8 @@ import (
 )
 
 type IAccessRefreshTokenDao interface {
+	QueryAccessTokenByToken(token string) *model.OauthAccessToken
+
 	QueryAccessRefreshTokenByUserId(userId int64, clientId string) (*model.OauthAccessToken, *model.OauthRefreshToken)
 	// 保存token
 	// 1、删除当前用户下所有未过期的accessToken，refreshToken
@@ -20,6 +22,19 @@ type IAccessRefreshTokenDao interface {
 }
 
 type AccessRefreshTokenDaoImpl struct{}
+
+func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) QueryAccessTokenByToken(token string) *model.OauthAccessToken {
+	var accessToken model.OauthAccessToken
+	err := db.GetDb().Find(&accessToken, "token = ? and expired_at > ? and del = 0", token, timeUtil.GetNowTimestamp()).Error
+	if err != nil {
+		if err.Error() == common.DB_RECORD_NOT_EXIST {
+			return nil
+		} else {
+			panic(common.Failure(common.DB_QUERY_ERROR))
+		}
+	}
+	return &accessToken
+}
 
 func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) QueryAccessRefreshTokenByUserId(userId int64, clientId string) (accessToken *model.OauthAccessToken, refreshToken *model.OauthRefreshToken) {
 	err := db.GetDb().Find(&accessToken, "user_id = ? and client_id = ? and expired_at > ? and del = 0",

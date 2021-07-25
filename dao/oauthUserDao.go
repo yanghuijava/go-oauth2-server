@@ -9,9 +9,23 @@ import (
 type IoauthUserDao interface {
 	Save(user *model.OauthUser) error
 	QueryByName(name string) *model.OauthUser
+	QueryById(id int64) *model.OauthUser
 }
 
 type OauthUserDaoImpl struct{}
+
+func (userDao *OauthUserDaoImpl) QueryById(id int64) *model.OauthUser {
+	var user model.OauthUser
+	err := db.GetDb().Find(&user, "id = ?", id).Error
+	if err != nil {
+		if err.Error() == common.DB_RECORD_NOT_EXIST {
+			return nil
+		} else {
+			panic(common.Failure(common.DB_QUERY_ERROR))
+		}
+	}
+	return &user
+}
 
 func (userDao *OauthUserDaoImpl) Save(user *model.OauthUser) error {
 	return db.GetDb().Save(user).Error

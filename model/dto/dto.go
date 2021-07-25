@@ -26,3 +26,11 @@ type AccessTokenRespose struct {
 	Openid       string `json:"openid"`
 	Scope        string `json:"scope"`
 }
+
+type UserInfoResponse struct {
+	NickName string `json:"nickName"`
+	Nation   string `json:"nation"`
+	Province string `json:"province"`
+	City     string `json:"city"`
+	Openid   string `json:"openid"`
+}
