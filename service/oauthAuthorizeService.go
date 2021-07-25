@@ -18,8 +18,10 @@ type IoauthAuthorizeService interface {
 	//校验客户端参数
 	CheckAuthorizeParams(request *dto.OauthAuthorizeRequest) error
 	//获取授权码
-	AuthorizeCode(request *dto.OauthAuthorizeRequest, user model.OauthUser) (string, error)
-
+	AuthorizeCode(request *dto.OauthAuthorizeRequest, user *model.OauthUser) (string, error)
+	//授权码简化模式，直接返回token，而不是code,不支持refreshToken
+	AuthorizeToken(request *dto.OauthAuthorizeRequest, user *model.OauthUser) (*dto.AccessTokenRespose, error)
+	//获取accessToken
 	AccessToken(request *dto.AccessTokenReuqest) (*dto.AccessTokenRespose, err.Err)
 }
 
@@ -47,7 +49,7 @@ func (authorizeService *OauthAuthorizeServiceImpl) CheckAuthorizeParams(request 
 	if clientDetail.Scope != request.Scope {
 		return errors.New("不支持的scope值")
 	}
-	if request.ResponseType != "code" {
+	if !(request.ResponseType == common.RESP_TYPE_CODE || request.ResponseType == common.RESP_TYPE_TOKEN) {
 		return errors.New("不支持的response_type值")
 	}
 	if request.RedirectUri != clientDetail.WebServerRedirectUri {
@@ -56,8 +58,9 @@ func (authorizeService *OauthAuthorizeServiceImpl) CheckAuthorizeParams(request 
 	return nil
 }
 
+//获取授权码
 func (authorizeService *OauthAuthorizeServiceImpl) AuthorizeCode(request *dto.OauthAuthorizeRequest,
-	user model.OauthUser) (code string, err error) {
+	user *model.OauthUser) (code string, err error) {
 	err = authorizeService.CheckAuthorizeParams(request)
 	if err != nil {
 		return code, err
@@ -83,18 +86,38 @@ func (authorizeService *OauthAuthorizeServiceImpl) AuthorizeCode(request *dto.Oa
 	return code, nil
 }
 
+func (authorizeService *OauthAuthorizeServiceImpl) AuthorizeToken(request *dto.OauthAuthorizeRequest,
+	user *model.OauthUser) (respose *dto.AccessTokenRespose, e error) {
+	e = authorizeService.CheckAuthorizeParams(request)
+	if e != nil {
+		return nil, e
+	}
+	accessTokenReuqest := &dto.AccessTokenReuqest{
+		ClientId:  request.ClientId,
+		OauthUser: user,
+		Scope:     request.Scope,
+		GrantType: grantType.IMPLICIT,
+	}
+	respose, er := authorizeService.AccessToken(accessTokenReuqest)
+	if er != nil {
+		return nil, errors.New(er.Err().GetDesc())
+	}
+	return respose, nil
+}
+
 func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.AccessTokenReuqest) (reponse *dto.AccessTokenRespose, e err.Err) {
 	client := authorizeService.clientDetailDao.QueryByClientId(request.ClientId)
 	if client == nil {
 		return nil, err.NewErr(common.CLIENT_ID_NOT_EXIST)
 	}
-	if client.ClientSecret != request.Secret {
-		return nil, err.NewErr(common.CLIENT_SECRET_ERROR)
+	if !client.IsExist(request.GrantType) {
+		return nil, err.NewErr(common.CLIENT_NOT_SUPPORT)
 	}
 	switch request.GrantType {
 	case grantType.CODE:
 		return handleCodeModel(request, client, authorizeService)
 	case grantType.IMPLICIT:
+		return handleImclicitModel(request, client, authorizeService)
 	case grantType.CLIENT:
 	case grantType.PASSWORD:
 	case grantType.REFRESH:
@@ -105,12 +128,44 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 	return reponse, e
 }
 
+//处理简化模式逻辑
+func handleImclicitModel(request *dto.AccessTokenReuqest,
+	client *model.OauthClientDetail,
+	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	if request.OauthUser == nil {
+		return nil, err.NewErr(common.USER_NOT_AUTH)
+	}
+	//生成token和refreshToken,如果存在就直接删除，产生新的
+	accessTokenSave := &model.OauthAccessToken{
+		Token:     myuuid.SimpleUUID(),
+		ClientId:  request.ClientId,
+		UserId:    request.OauthUser.Id,
+		Scope:     request.Scope,
+		ExpiredAt: timeUtil.GetNowTimestamp() + int64(client.AccessTokenValidity*1000),
+	}
+	err := authorizeService.accessRefreshTokenDao.SaveToken(accessTokenSave, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+	reponse = &dto.AccessTokenRespose{
+		AccessToken: accessTokenSave.Token,
+		ExpiresIn:   client.AccessTokenValidity,
+		Scope:       request.Scope,
+		//openid=MD5(clientId + userId)
+		Openid: mymd5.Md5(client.ClientId + strconv.FormatInt(request.OauthUser.Id, 10)),
+	}
+	return reponse, nil
+}
+
 //处理授权码模式逻辑
 func handleCodeModel(request *dto.AccessTokenReuqest,
 	client *model.OauthClientDetail,
 	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
 	if request.Code == "" {
 		return nil, err.NewErr(common.CODE_EMPTY)
+	}
+	if client.ClientSecret != request.Secret {
+		return nil, err.NewErr(common.CLIENT_SECRET_ERROR)
 	}
 	oauthCode := authorizeService.codeDao.QueryNotExpiredByCode(request.Code)
 	if oauthCode == nil {
@@ -121,17 +176,19 @@ func handleCodeModel(request *dto.AccessTokenReuqest,
 		Token:     myuuid.SimpleUUID(),
 		ClientId:  oauthCode.ClientId,
 		UserId:    oauthCode.UserId,
+		Scope:     oauthCode.Scope,
 		ExpiredAt: timeUtil.GetNowTimestamp() + int64(client.AccessTokenValidity*1000),
 	}
 	refreshTokenSave := &model.OauthRefreshToken{
 		RefreshToken: myuuid.SimpleUUID(),
 		ClientId:     oauthCode.ClientId,
 		UserId:       oauthCode.UserId,
+		Scope:        oauthCode.Scope,
 		ExpiredAt:    timeUtil.GetNowTimestamp() + int64(client.RefreshTokenValidity*1000),
 	}
 	//code使用一次必须删除
 	oauthCode.Del = common.DEL
-	err := authorizeService.accessRefreshTokenDao.SaveCodeModelToken(accessTokenSave, refreshTokenSave, oauthCode)
+	err := authorizeService.accessRefreshTokenDao.SaveToken(accessTokenSave, refreshTokenSave, oauthCode)
 	if err != nil {
 		return nil, err
 	}

@@ -1,5 +1,7 @@
 package dto
 
+import "go-oauth2-server/model"
+
 type OauthAuthorizeRequest struct {
 	ClientId     string
 	RedirectUri  string
@@ -9,10 +11,12 @@ type OauthAuthorizeRequest struct {
 }
 
 type AccessTokenReuqest struct {
-	ClientId  string `json:"clientId"`
-	Secret    string `json:"secret"`
-	Code      string `json:"code"`
-	GrantType string `json:"grantType"`
+	ClientId  string           `json:"clientId"`
+	Secret    string           `json:"secret"`
+	Code      string           `json:"code"`
+	GrantType string           `json:"grantType"`
+	OauthUser *model.OauthUser `json:"oauthUser"`
+	Scope     string           `json:"scope"`
 }
 
 type AccessTokenRespose struct {

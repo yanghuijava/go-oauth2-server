@@ -74,14 +74,26 @@ func (route *OauthAuthorizeRoutes) authorize(engine *gin.Engine) {
 			State:        queryMap["state"],
 		}
 		session := sessions.Default(c)
-		code, err := route.authorizeService.AuthorizeCode(authorizeRequest, session.Get("user").(model.OauthUser))
-		if err != nil {
-			c.HTML(401, "authorizeError.html", gin.H{
-				"msg": err.Error(),
-			})
-			return
+		user := session.Get("user").(model.OauthUser)
+		if authorizeRequest.ResponseType == common.RESP_TYPE_CODE {
+			code, err := route.authorizeService.AuthorizeCode(authorizeRequest, &user)
+			if err != nil {
+				c.HTML(401, "authorizeError.html", gin.H{
+					"msg": err.Error(),
+				})
+				return
+			}
+			c.Redirect(302, authorizeRequest.RedirectUri+"?code="+code+"&state="+authorizeRequest.State)
+		} else {
+			resp, err := route.authorizeService.AuthorizeToken(authorizeRequest, &user)
+			if err != nil {
+				c.HTML(401, "authorizeError.html", gin.H{
+					"msg": err.Error(),
+				})
+				return
+			}
+			c.Redirect(302, authorizeRequest.RedirectUri+"?accessToken="+resp.AccessToken+"&ExpiresIn="+strconv.Itoa(resp.ExpiresIn)+"&Openid="+resp.Openid+"&Scope="+resp.Scope+"&state="+authorizeRequest.State)
 		}
-		c.Redirect(302, authorizeRequest.RedirectUri+"?code="+code+"&state="+authorizeRequest.State)
 	})
 }
 

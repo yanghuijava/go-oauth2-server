@@ -8,6 +8,9 @@ const DEL = 1
 //未删除标识
 const NOT_DEL = 0
 
+const RESP_TYPE_CODE = "code"
+const RESP_TYPE_TOKEN = "token"
+
 type ResultCode int
 
 const (
@@ -26,6 +29,8 @@ const (
 	CODE_ERROR            ResultCode = 100011
 	DB_TX_ERROR           ResultCode = 100012
 	DB_ERROR              ResultCode = 100013
+	CLIENT_NOT_SUPPORT    ResultCode = 100014
+	USER_NOT_AUTH         ResultCode = 100015
 )
 
 func (code ResultCode) GetCode() int {
@@ -64,6 +69,10 @@ func (code ResultCode) GetDesc() string {
 		return "数据库开启事务错误"
 	case DB_ERROR:
 		return "数据库错误"
+	case CLIENT_NOT_SUPPORT:
+		return "当前客户端不支持的授权模式"
+	case USER_NOT_AUTH:
+		return "用户未授权"
 	default:
 		return "未知"
 	}

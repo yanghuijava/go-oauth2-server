@@ -11,11 +11,12 @@ import (
 
 type IAccessRefreshTokenDao interface {
 	QueryAccessRefreshTokenByUserId(userId int64, clientId string) (*model.OauthAccessToken, *model.OauthRefreshToken)
-	// 保存授权码模式下的token.
+	// 保存token
 	// 1、删除当前用户下所有未过期的accessToken，refreshToken
-	// 2、保存新的accessToken，refreshToken
-	// 3、删除code
-	SaveCodeModelToken(accessTokenSave *model.OauthAccessToken, refreshTokenSave *model.OauthRefreshToken, codeDel *model.OauthCode) err.Err
+	// 2、保存新的accessToken
+	// 3、refreshToken 不为nil则保存
+	// 4、codeDel 不为nil则删除
+	SaveToken(accessTokenSave *model.OauthAccessToken, refreshTokenSave *model.OauthRefreshToken, codeDel *model.OauthCode) err.Err
 }
 
 type AccessRefreshTokenDaoImpl struct{}
@@ -42,7 +43,7 @@ func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) QueryAccessRefreshTokenB
 	return accessToken, refreshToken
 }
 
-func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) SaveCodeModelToken(accessTokenSave *model.OauthAccessToken,
+func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) SaveToken(accessTokenSave *model.OauthAccessToken,
 	refreshTokenSave *model.OauthRefreshToken, codeDel *model.OauthCode) (errResult err.Err) {
 	tx := db.GetDb().Begin()
 	if tx.Error != nil {
@@ -59,12 +60,12 @@ func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) SaveCodeModelToken(acces
 	//查询未过期的accessToken,存在则删除
 	var accessTokens []model.OauthAccessToken
 	if e := tx.Find(&accessTokens, "client_id = ? and user_id = ? and expired_at > ? and del = 0",
-		codeDel.ClientId, codeDel.UserId, timeUtil.GetNowTimestamp()).Error; e != nil {
+		accessTokenSave.ClientId, accessTokenSave.UserId, timeUtil.GetNowTimestamp()).Error; e != nil {
 		panic(e.Error())
 	}
 	if accessTokens != nil && len(accessTokens) > 0 {
 		for _, v := range accessTokens {
-			if e := tx.Model(&v).Update("del", 1).Error; e != nil {
+			if e := tx.Model(&v).Update("del", common.DEL).Error; e != nil {
 				panic(e.Error())
 			}
 		}
@@ -72,12 +73,12 @@ func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) SaveCodeModelToken(acces
 	//查询未过期的refreshToken,存在则删除
 	var refreshTokens []model.OauthRefreshToken
 	if e := tx.Find(&refreshTokens, "client_id = ? and user_id = ? and expired_at > ? and del = 0",
-		codeDel.ClientId, codeDel.UserId, timeUtil.GetNowTimestamp()).Error; e != nil {
+		accessTokenSave.ClientId, accessTokenSave.UserId, timeUtil.GetNowTimestamp()).Error; e != nil {
 		panic(e.Error())
 	}
 	if refreshTokens != nil && len(refreshTokens) > 0 {
 		for _, v := range refreshTokens {
-			if e := tx.Model(&v).Update("del", 1).Error; e != nil {
+			if e := tx.Model(&v).Update("del", common.DEL).Error; e != nil {
 				panic(e.Error())
 			}
 		}
@@ -85,11 +86,15 @@ func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) SaveCodeModelToken(acces
 	if e := tx.Save(accessTokenSave).Error; e != nil {
 		panic("保存accessToken错误：" + e.Error())
 	}
-	if e := tx.Save(refreshTokenSave).Error; e != nil {
-		panic("保存refreshToken错误：" + e.Error())
+	if refreshTokenSave != nil {
+		if e := tx.Save(refreshTokenSave).Error; e != nil {
+			panic("保存refreshToken错误：" + e.Error())
+		}
 	}
-	if e := tx.Model(&codeDel).Update("del", codeDel.Del).Error; e != nil {
-		panic("删除code错误：" + e.Error())
+	if codeDel != nil {
+		if e := tx.Model(&codeDel).Update("del", codeDel.Del).Error; e != nil {
+			panic("删除code错误：" + e.Error())
+		}
 	}
 	if e := tx.Commit().Error; e != nil {
 		panic("提交事务错误：" + e.Error())

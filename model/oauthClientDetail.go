@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type OauthClientDetail struct {
 	Id           int64  `gorm:"column:id;primary_key;AUTO_INCREMENT"`
@@ -32,4 +35,8 @@ func NewOauthClientDetail(clientId string, clientSecret string,
 
 func (m *OauthClientDetail) TableName() string {
 	return "oauth_client_detail"
+}
+
+func (m *OauthClientDetail) IsExist(grantType string) bool {
+	return strings.Contains(m.AuthorizedGrantTypes, grantType)
 }
