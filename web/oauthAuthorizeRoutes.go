@@ -3,10 +3,13 @@ package web
 import (
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"go-oauth2-server/common"
 	"go-oauth2-server/model"
 	"go-oauth2-server/model/dto"
 	"go-oauth2-server/service"
 	"go-oauth2-server/util"
+	"net/http"
 	"net/url"
 	"strconv"
 )
@@ -24,11 +27,11 @@ func NewOauthAuthorizeRoutes(authorizeService service.IoauthAuthorizeService) *O
 func (route *OauthAuthorizeRoutes) RegisterRoutes(engine *gin.Engine) {
 	route.authorizeHtml(engine)
 	route.authorize(engine)
+	route.accessToken(engine)
 }
 
 func (route *OauthAuthorizeRoutes) authorizeHtml(engine *gin.Engine) {
 	engine.GET("/oauth/authorize.html", func(c *gin.Context) {
-		//TODO 此处需要校验客户端申请的scope值
 		queryMap := *util.ParseUrlQuery(c.Request.URL.RawQuery)
 		authorizeRequest := &dto.OauthAuthorizeRequest{
 			ClientId:     queryMap["client_id"],
@@ -50,8 +53,10 @@ func (route *OauthAuthorizeRoutes) authorizeHtml(engine *gin.Engine) {
 	})
 }
 
+//用户授权获取授权码
 func (route *OauthAuthorizeRoutes) authorize(engine *gin.Engine) {
 	engine.POST("/oauth/authorize", func(c *gin.Context) {
+		//通过post提交表单后，url上传递的值被urlencode了，无法通过c.Query("xxx")获取，暂时自己解析
 		query, _ := url.QueryUnescape(c.Request.URL.RawQuery)
 		queryMap := *util.ParseUrlQuery(query)
 		action, _ := strconv.Atoi(c.PostForm("action"))
@@ -77,5 +82,28 @@ func (route *OauthAuthorizeRoutes) authorize(engine *gin.Engine) {
 			return
 		}
 		c.Redirect(302, authorizeRequest.RedirectUri+"?code="+code+"&state="+authorizeRequest.State)
+	})
+}
+
+//获取accessToken
+func (route *OauthAuthorizeRoutes) accessToken(engine *gin.Engine) {
+	engine.POST("/oauth/access/token", func(c *gin.Context) {
+		var request dto.AccessTokenReuqest
+		err := c.BindJSON(&request)
+		if err != nil {
+			c.JSON(http.StatusOK, common.Failure(common.PARAMS_ERROR))
+			return
+		}
+		logrus.Infof("获取accessToken入参：%v", request)
+		if request.ClientId == "" || request.GrantType == "" || request.Secret == "" {
+			c.JSON(http.StatusOK, common.Failure(common.PARAMS_ERROR))
+			return
+		}
+		response, e := route.authorizeService.AccessToken(&request)
+		if e != nil {
+			c.JSON(http.StatusOK, common.Failure(e.Err()))
+			return
+		}
+		c.JSON(http.StatusOK, response)
 	})
 }

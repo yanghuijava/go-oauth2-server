@@ -27,5 +27,8 @@ func InitDb() {
 	d.DB().SetMaxOpenConns(10)
 	d.DB().SetMaxIdleConns(5)
 	db = d
+	db.Debug()
+	db.SingularTable(true)
+	db.LogMode(true)
 	logrus.Info("数据库连接成功")
 }

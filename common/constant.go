@@ -2,6 +2,12 @@ package common
 
 const DB_RECORD_NOT_EXIST = "record not found"
 
+//删除标识
+const DEL = 1
+
+//未删除标识
+const NOT_DEL = 0
+
 type ResultCode int
 
 const (
@@ -12,6 +18,14 @@ const (
 	DB_QUERY_ERROR        ResultCode = 100003
 	USER_NOT_EXIST        ResultCode = 100004
 	PASSWORD_ERROR        ResultCode = 100005
+	PARAMS_ERROR          ResultCode = 100006
+	NO_NSUPPORT_GRANTTYPE ResultCode = 100007
+	CLIENT_ID_NOT_EXIST   ResultCode = 100008
+	CLIENT_SECRET_ERROR   ResultCode = 100009
+	CODE_EMPTY            ResultCode = 100010
+	CODE_ERROR            ResultCode = 100011
+	DB_TX_ERROR           ResultCode = 100012
+	DB_ERROR              ResultCode = 100013
 )
 
 func (code ResultCode) GetCode() int {
@@ -34,6 +48,22 @@ func (code ResultCode) GetDesc() string {
 		return "用户不存在"
 	case PASSWORD_ERROR:
 		return "密码错误"
+	case PARAMS_ERROR:
+		return "参数错误"
+	case NO_NSUPPORT_GRANTTYPE:
+		return "不支持的授权模式"
+	case CLIENT_ID_NOT_EXIST:
+		return "client_id不存在"
+	case CODE_EMPTY:
+		return "授权码模式下，code不能为空"
+	case CODE_ERROR:
+		return "授权码不正确或者已失效"
+	case CLIENT_SECRET_ERROR:
+		return "secret不正确"
+	case DB_TX_ERROR:
+		return "数据库开启事务错误"
+	case DB_ERROR:
+		return "数据库错误"
 	default:
 		return "未知"
 	}

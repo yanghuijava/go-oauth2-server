@@ -7,3 +7,18 @@ type OauthAuthorizeRequest struct {
 	Scope        string
 	State        string
 }
+
+type AccessTokenReuqest struct {
+	ClientId  string `json:"clientId"`
+	Secret    string `json:"secret"`
+	Code      string `json:"code"`
+	GrantType string `json:"grantType"`
+}
+
+type AccessTokenRespose struct {
+	AccessToken  string `json:"accessToken"`
+	ExpiresIn    int    `json:"expiresIn"`
+	RefreshToken string `json:"refreshToken"`
+	Openid       string `json:"openid"`
+	Scope        string `json:"scope"`
+}

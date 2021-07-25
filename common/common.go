@@ -1,9 +1,9 @@
 package common
 
 type Result struct {
-	Code int
-	Desc string
-	Data interface{}
+	Code int         `json:"code"`
+	Desc string      `json:"desc"`
+	Data interface{} `json:"data"`
 }
 
 func (r Result) IsSucess() bool {
