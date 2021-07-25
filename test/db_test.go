@@ -32,3 +32,16 @@ func TestDb1(t *testing.T) {
 	}
 	tx.Commit()
 }
+
+func TestDb2(t *testing.T) {
+	db.InitDb()
+	defer db.Close()
+	var user model.OauthUser
+	if err := db.GetDb().Find(&user, "id = ?", 1).Error; err != nil {
+		t.Error(err)
+	}
+	db.GetDb().Save(&model.OauthUser{
+		Id:       user.Id,
+		NickName: "正是那朵玫瑰",
+	})
+}

@@ -11,12 +11,13 @@ type OauthAuthorizeRequest struct {
 }
 
 type AccessTokenReuqest struct {
-	ClientId  string           `json:"clientId"`
-	Secret    string           `json:"secret"`
-	Code      string           `json:"code"`
-	GrantType string           `json:"grantType"`
-	OauthUser *model.OauthUser `json:"oauthUser"`
-	Scope     string           `json:"scope"`
+	ClientId     string           `json:"clientId"`
+	Secret       string           `json:"secret"`
+	Code         string           `json:"code"`
+	GrantType    string           `json:"grantType"`
+	OauthUser    *model.OauthUser `json:"oauthUser"`
+	Scope        string           `json:"scope"`
+	RefreshToken string           `json:"refreshToken"`
 }
 
 type AccessTokenRespose struct {

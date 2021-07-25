@@ -118,14 +118,58 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 		return handleCodeModel(request, client, authorizeService)
 	case grantType.IMPLICIT:
 		return handleImclicitModel(request, client, authorizeService)
+	case grantType.REFRESH:
+		return handleRefreshModel(request, client, authorizeService)
 	case grantType.CLIENT:
 	case grantType.PASSWORD:
-	case grantType.REFRESH:
+
 	default:
 		e = err.NewErr(common.NO_NSUPPORT_GRANTTYPE)
 		break
 	}
 	return reponse, e
+}
+
+func handleRefreshModel(request *dto.AccessTokenReuqest,
+	client *model.OauthClientDetail,
+	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	if request.RefreshToken == "" {
+		return nil, err.NewErr(common.REFRESH_TOKEN_EMPTY)
+	}
+	refresh := authorizeService.accessRefreshTokenDao.QueryRefreshTokenByRefreshToken(request.RefreshToken)
+	if refresh == nil {
+		return nil, err.NewErr(common.REFRESH_TOKEN_INVALID)
+	}
+	access := authorizeService.accessRefreshTokenDao.QueryAccessTokenByUserId(refresh.UserId, refresh.ClientId)
+	reponse = &dto.AccessTokenRespose{
+		ExpiresIn:    client.AccessTokenValidity,
+		Scope:        refresh.Scope,
+		RefreshToken: refresh.RefreshToken,
+		//openid=MD5(clientId + userId)
+		Openid: mymd5.Md5(client.ClientId + strconv.FormatInt(refresh.UserId, 10)),
+	}
+	// accessToken存在且未过期，只延长过期时间，不生成新的accessToken；不存在生成新的
+	if access == nil {
+		accessTokenSave := &model.OauthAccessToken{
+			Token:     myuuid.SimpleUUID(),
+			ClientId:  refresh.ClientId,
+			UserId:    refresh.UserId,
+			ExpiredAt: timeUtil.GetNowTimestamp() + int64(client.AccessTokenValidity*1000),
+			Scope:     refresh.Scope,
+		}
+		e := authorizeService.accessRefreshTokenDao.SaveAccessToken(accessTokenSave)
+		if e != nil {
+			return nil, e
+		}
+		reponse.AccessToken = accessTokenSave.Token
+	} else {
+		e := authorizeService.accessRefreshTokenDao.UpdateAccessTokenExpiredAtByToken(access.Token, timeUtil.GetNowTimestamp()+int64(client.AccessTokenValidity*1000))
+		if e != nil {
+			return nil, e
+		}
+		reponse.AccessToken = access.Token
+	}
+	return reponse, nil
 }
 
 //处理简化模式逻辑

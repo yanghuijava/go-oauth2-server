@@ -33,6 +33,8 @@ const (
 	USER_NOT_AUTH         ResultCode = 100015
 	TOKEN_INVALID         ResultCode = 100016
 	TOKEN_EMPTY           ResultCode = 100017
+	REFRESH_TOKEN_EMPTY   ResultCode = 100018
+	REFRESH_TOKEN_INVALID ResultCode = 100019
 )
 
 func (code ResultCode) GetCode() int {
@@ -79,6 +81,10 @@ func (code ResultCode) GetDesc() string {
 		return "token不能为空"
 	case TOKEN_INVALID:
 		return "token无效"
+	case REFRESH_TOKEN_EMPTY:
+		return "refreshToken不能为空"
+	case REFRESH_TOKEN_INVALID:
+		return "refreshToken无效或者不支持refreshToken机制"
 	default:
 		return "未知"
 	}

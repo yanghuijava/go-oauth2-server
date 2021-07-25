@@ -10,18 +10,70 @@ import (
 )
 
 type IAccessRefreshTokenDao interface {
+	QueryRefreshTokenByRefreshToken(refreshToken string) *model.OauthRefreshToken
+
 	QueryAccessTokenByToken(token string) *model.OauthAccessToken
 
 	QueryAccessRefreshTokenByUserId(userId int64, clientId string) (*model.OauthAccessToken, *model.OauthRefreshToken)
+
+	QueryAccessTokenByUserId(userId int64, clientId string) *model.OauthAccessToken
 	// 保存token
 	// 1、删除当前用户下所有未过期的accessToken，refreshToken
 	// 2、保存新的accessToken
 	// 3、refreshToken 不为nil则保存
 	// 4、codeDel 不为nil则删除
 	SaveToken(accessTokenSave *model.OauthAccessToken, refreshTokenSave *model.OauthRefreshToken, codeDel *model.OauthCode) err.Err
+
+	UpdateAccessTokenExpiredAtByToken(token string, expiredAt int64) err.Err
+
+	SaveAccessToken(token *model.OauthAccessToken) err.Err
 }
 
 type AccessRefreshTokenDaoImpl struct{}
+
+func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) SaveAccessToken(token *model.OauthAccessToken) err.Err {
+	if e := db.GetDb().Save(token).Error; e != nil {
+		logrus.Errorf("保存accessToken错误：%s", e.Error())
+		return err.NewErr(common.DB_ERROR)
+	}
+	return nil
+}
+
+func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) UpdateAccessTokenExpiredAtByToken(token string, expiredAt int64) err.Err {
+	e := db.GetDb().Model(&model.OauthAccessToken{}).Where("token = ?", token).Update("expired_at", expiredAt).Error
+	if e != nil {
+		logrus.Errorf("更新错误：%s", e.Error())
+		return err.NewErr(common.DB_ERROR)
+	}
+	return nil
+}
+
+func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) QueryAccessTokenByUserId(userId int64, clientId string) *model.OauthAccessToken {
+	var accessToken model.OauthAccessToken
+	err := db.GetDb().Find(&accessToken, "user_id = ? and client_id = ? and expired_at > ? and del = 0",
+		userId, clientId, timeUtil.GetNowTimestamp()).Error
+	if err != nil {
+		if err.Error() == common.DB_RECORD_NOT_EXIST {
+			return nil
+		} else {
+			panic(common.Failure(common.DB_QUERY_ERROR))
+		}
+	}
+	return &accessToken
+}
+
+func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) QueryRefreshTokenByRefreshToken(refreshTokenStr string) *model.OauthRefreshToken {
+	var refreshToken model.OauthRefreshToken
+	if err := db.GetDb().Find(&refreshToken, "refresh_token = ? and expired_at > ? and del = 0",
+		refreshTokenStr, timeUtil.GetNowTimestamp()).Error; err != nil {
+		if err.Error() == common.DB_RECORD_NOT_EXIST {
+			return nil
+		} else {
+			panic(common.Failure(common.DB_QUERY_ERROR))
+		}
+	}
+	return &refreshToken
+}
 
 func (accessRefreshTokenDao *AccessRefreshTokenDaoImpl) QueryAccessTokenByToken(token string) *model.OauthAccessToken {
 	var accessToken model.OauthAccessToken
