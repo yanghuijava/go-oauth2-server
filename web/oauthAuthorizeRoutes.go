@@ -5,13 +5,16 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
 	"go-oauth2-server/common"
+	"go-oauth2-server/common/grantType"
 	"go-oauth2-server/model"
 	"go-oauth2-server/model/dto"
 	"go-oauth2-server/service"
 	"go-oauth2-server/util"
+	"go-oauth2-server/util/mybase64"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 )
 
 type OauthAuthorizeRoutes struct {
@@ -106,8 +109,31 @@ func (route *OauthAuthorizeRoutes) accessToken(engine *gin.Engine) {
 			c.JSON(http.StatusOK, common.Failure(common.PARAMS_ERROR))
 			return
 		}
+		request.OauthUser = nil //用户信息不允许直接从当前接口传入
 		logrus.Infof("获取accessToken入参：%v", request)
-		if request.ClientId == "" || request.GrantType == "" || request.Secret == "" {
+		//TODO 移走
+		if request.GrantType == grantType.PASSWORD {
+			basicAuth := c.GetHeader("Authorization") //获取密码模式的clientId和secret
+			if basicAuth == "" {
+				c.JSON(http.StatusOK, common.Failure(common.AUTHORIZATION_EMPTY))
+				return
+			}
+			basicAuth = strings.Replace(basicAuth, "Basic ", "", -1)
+			data, er := mybase64.Decode(basicAuth)
+			if er != nil {
+				logrus.Errorf("base64解码错误：%s", er.Error())
+				c.JSON(http.StatusOK, common.Failure(common.BASE64_ERROR))
+				return
+			}
+			dataArr := strings.Split(data, ":")
+			request.ClientId = ""
+			request.Secret = ""
+			if len(dataArr) == 2 {
+				request.ClientId = dataArr[0]
+				request.Secret = dataArr[1]
+			}
+		}
+		if request.GrantType == "" {
 			c.JSON(http.StatusOK, common.Failure(common.PARAMS_ERROR))
 			return
 		}

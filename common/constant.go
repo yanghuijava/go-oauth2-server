@@ -35,6 +35,9 @@ const (
 	TOKEN_EMPTY           ResultCode = 100017
 	REFRESH_TOKEN_EMPTY   ResultCode = 100018
 	REFRESH_TOKEN_INVALID ResultCode = 100019
+	AUTHORIZATION_EMPTY   ResultCode = 100020
+	BASE64_ERROR          ResultCode = 100021
+	CLIENT_ID_EMPTY       ResultCode = 100022
 )
 
 func (code ResultCode) GetCode() int {
@@ -85,6 +88,12 @@ func (code ResultCode) GetDesc() string {
 		return "refreshToken不能为空"
 	case REFRESH_TOKEN_INVALID:
 		return "refreshToken无效或者不支持refreshToken机制"
+	case AUTHORIZATION_EMPTY:
+		return "密码模式下Authorization不能为空"
+	case BASE64_ERROR:
+		return "base64解码错误"
+	case CLIENT_ID_EMPTY:
+		return "clientId不能为空"
 	default:
 		return "未知"
 	}

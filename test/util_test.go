@@ -3,6 +3,7 @@ package test
 import (
 	"fmt"
 	"go-oauth2-server/util"
+	"go-oauth2-server/util/mybase64"
 	"go-oauth2-server/util/mymd5"
 	"go-oauth2-server/util/myuuid"
 	timeUtil2 "go-oauth2-server/util/timeUtil"
@@ -25,4 +26,12 @@ func TestUUID(t *testing.T) {
 func TestParseUrlQuery(t *testing.T) {
 	m := util.ParseUrlQuery("client_id=test_client_1&redirect_uri=https://www.example.com&response_type=code&scope=all&state=dsdsd")
 	fmt.Println(m)
+}
+
+func TestDecode(t *testing.T) {
+	re, err := mybase64.Decode("YWRtaW46MTIzNDU2")
+	if err != nil {
+		t.Error(err)
+	}
+	fmt.Println(re)
 }

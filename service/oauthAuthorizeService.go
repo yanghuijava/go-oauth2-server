@@ -105,7 +105,10 @@ func (authorizeService *OauthAuthorizeServiceImpl) AuthorizeToken(request *dto.O
 	return respose, nil
 }
 
-func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.AccessTokenReuqest) (reponse *dto.AccessTokenRespose, e err.Err) {
+func (authorizeService *OauthAuthorizeServiceImpl) checkClient(request *dto.AccessTokenReuqest) (*model.OauthClientDetail, err.Err) {
+	if request.ClientId == "" {
+		return nil, err.NewErr(common.CLIENT_ID_EMPTY)
+	}
 	client := authorizeService.clientDetailDao.QueryByClientId(request.ClientId)
 	if client == nil {
 		return nil, err.NewErr(common.CLIENT_ID_NOT_EXIST)
@@ -113,16 +116,19 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 	if !client.IsExist(request.GrantType) {
 		return nil, err.NewErr(common.CLIENT_NOT_SUPPORT)
 	}
+	return client, nil
+}
+
+func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.AccessTokenReuqest) (reponse *dto.AccessTokenRespose, e err.Err) {
 	switch request.GrantType {
 	case grantType.CODE:
-		return handleCodeModel(request, client, authorizeService)
+		return handleCodeModel(request, authorizeService)
 	case grantType.IMPLICIT:
-		return handleImclicitModel(request, client, authorizeService)
+		return handleImclicitModel(request, authorizeService)
 	case grantType.REFRESH:
-		return handleRefreshModel(request, client, authorizeService)
-	case grantType.CLIENT:
+		return handleRefreshModel(request, authorizeService)
 	case grantType.PASSWORD:
-
+	case grantType.CLIENT:
 	default:
 		e = err.NewErr(common.NO_NSUPPORT_GRANTTYPE)
 		break
@@ -130,9 +136,18 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 	return reponse, e
 }
 
-func handleRefreshModel(request *dto.AccessTokenReuqest,
+func handlePassword(request *dto.AccessTokenReuqest,
 	client *model.OauthClientDetail,
 	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	return nil, nil
+}
+
+func handleRefreshModel(request *dto.AccessTokenReuqest,
+	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	client, e := authorizeService.checkClient(request)
+	if e != nil {
+		return nil, e
+	}
 	if request.RefreshToken == "" {
 		return nil, err.NewErr(common.REFRESH_TOKEN_EMPTY)
 	}
@@ -174,8 +189,11 @@ func handleRefreshModel(request *dto.AccessTokenReuqest,
 
 //处理简化模式逻辑
 func handleImclicitModel(request *dto.AccessTokenReuqest,
-	client *model.OauthClientDetail,
 	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	client, e := authorizeService.checkClient(request)
+	if e != nil {
+		return nil, e
+	}
 	if request.OauthUser == nil {
 		return nil, err.NewErr(common.USER_NOT_AUTH)
 	}
@@ -203,8 +221,11 @@ func handleImclicitModel(request *dto.AccessTokenReuqest,
 
 //处理授权码模式逻辑
 func handleCodeModel(request *dto.AccessTokenReuqest,
-	client *model.OauthClientDetail,
 	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	client, e := authorizeService.checkClient(request)
+	if e != nil {
+		return nil, e
+	}
 	if request.Code == "" {
 		return nil, err.NewErr(common.CODE_EMPTY)
 	}
