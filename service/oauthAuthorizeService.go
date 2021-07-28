@@ -136,6 +136,7 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 	case grantType.PASSWORD:
 		return handlePassword(request, authorizeService)
 	case grantType.CLIENT:
+		return hanleClientCredentials(request, authorizeService)
 	default:
 		e = err.NewErr(common.NO_NSUPPORT_GRANTTYPE)
 		break
@@ -143,24 +144,65 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 	return reponse, e
 }
 
-func handlePassword(request *dto.AccessTokenReuqest,
-	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
-	if request.BasicAuth == "" {
+func (authorizeService *OauthAuthorizeServiceImpl) parseBasicAuth(basicAuth string) ([]string, err.Err) {
+	if basicAuth == "" {
 		return nil, err.NewErr(common.AUTHORIZATION_EMPTY)
 	}
-	basicAuth := strings.Replace(request.BasicAuth, "Basic ", "", -1)
+	basicAuth = strings.Replace(basicAuth, "Basic ", "", -1)
 	data, er := mybase64.Decode(basicAuth)
 	if er != nil {
 		logrus.Errorf("base64解码错误：%s", er.Error())
 		return nil, err.NewErr(common.BASE64_ERROR)
 	}
-	logrus.Infof("解码后数据：%s", data)
 	dataArr := strings.Split(data, ":")
 	if len(dataArr) != 2 {
 		return nil, err.NewErr(common.PARAMS_ERROR)
 	}
-	request.ClientId = dataArr[0]
-	request.Secret = dataArr[1]
+	return dataArr, nil
+}
+
+func hanleClientCredentials(request *dto.AccessTokenReuqest,
+	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	cs, e := authorizeService.parseBasicAuth(request.BasicAuth)
+	if e != nil {
+		return nil, e
+	}
+	request.ClientId = cs[0]
+	request.Secret = cs[1]
+	client, e := authorizeService.checkClient(request)
+	if e != nil {
+		return nil, e
+	}
+	if client.ClientSecret != request.Secret {
+		return nil, err.NewErr(common.CLIENT_SECRET_ERROR)
+	}
+	accessTokenSave := &model.OauthAccessToken{
+		Token:     myuuid.SimpleUUID(),
+		ClientId:  client.ClientId,
+		UserId:    int64(0),
+		Scope:     request.Scope,
+		ExpiredAt: timeUtil.GetNowTimestamp() + int64(client.AccessTokenValidity*1000),
+	}
+	e = authorizeService.accessRefreshTokenDao.SaveToken(accessTokenSave, nil, nil)
+	if e != nil {
+		return nil, e
+	}
+	reponse = &dto.AccessTokenRespose{
+		AccessToken: accessTokenSave.Token,
+		ExpiresIn:   client.AccessTokenValidity,
+		Scope:       request.Scope,
+	}
+	return reponse, nil
+}
+
+func handlePassword(request *dto.AccessTokenReuqest,
+	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
+	cs, e := authorizeService.parseBasicAuth(request.BasicAuth)
+	if e != nil {
+		return nil, e
+	}
+	request.ClientId = cs[0]
+	request.Secret = cs[1]
 	client, e := authorizeService.checkClient(request)
 	if e != nil {
 		return nil, e

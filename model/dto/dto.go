@@ -25,11 +25,11 @@ type AccessTokenReuqest struct {
 }
 
 type AccessTokenRespose struct {
-	AccessToken  string `json:"accessToken"`
-	ExpiresIn    int    `json:"expiresIn"`
-	RefreshToken string `json:"refreshToken"`
-	Openid       string `json:"openid"`
-	Scope        string `json:"scope"`
+	AccessToken  string `json:"accessToken,omitempty"`
+	ExpiresIn    int    `json:"expiresIn,omitempty"`
+	RefreshToken string `json:"refreshToken,omitempty"`
+	Openid       string `json:"openid,omitempty"`
+	Scope        string `json:"scope,omitempty"`
 }
 
 type UserInfoResponse struct {
