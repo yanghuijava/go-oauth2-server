@@ -18,6 +18,10 @@ type AccessTokenReuqest struct {
 	OauthUser    *model.OauthUser `json:"oauthUser"`
 	Scope        string           `json:"scope"`
 	RefreshToken string           `json:"refreshToken"`
+	BasicAuth    string           `json:"basicAuth"`
+
+	UserName string `json:"userName"`
+	Password string `json:"password"`
 }
 
 type AccessTokenRespose struct {

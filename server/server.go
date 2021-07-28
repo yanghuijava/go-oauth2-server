@@ -49,7 +49,7 @@ func Run() {
 
 	//初始化service
 	userService := service.NewOauthUserServiceImpl(userDao, accessRefreshTokenDao)
-	authorizeService := service.NewOauthAuthorizeServiceImpl(clientDetailDao, codeDao, accessRefreshTokenDao)
+	authorizeService := service.NewOauthAuthorizeServiceImpl(clientDetailDao, codeDao, accessRefreshTokenDao, userDao)
 	//注册路由
 	web.NewLoginRoute(userService).RegisterRoutes(router)
 	web.NewOauthAuthorizeRoutes(authorizeService).RegisterRoutes(router)

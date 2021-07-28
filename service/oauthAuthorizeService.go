@@ -2,16 +2,19 @@ package service
 
 import (
 	"errors"
+	"github.com/sirupsen/logrus"
 	"go-oauth2-server/common"
 	"go-oauth2-server/common/err"
 	"go-oauth2-server/common/grantType"
 	"go-oauth2-server/dao"
 	"go-oauth2-server/model"
 	"go-oauth2-server/model/dto"
+	"go-oauth2-server/util/mybase64"
 	"go-oauth2-server/util/mymd5"
 	"go-oauth2-server/util/myuuid"
 	"go-oauth2-server/util/timeUtil"
 	"strconv"
+	"strings"
 )
 
 type IoauthAuthorizeService interface {
@@ -29,15 +32,18 @@ type OauthAuthorizeServiceImpl struct {
 	clientDetailDao       dao.IoauthClientDetailDao
 	codeDao               dao.IoauthCodeDao
 	accessRefreshTokenDao dao.IAccessRefreshTokenDao
+	oauthUserDao          dao.IoauthUserDao
 }
 
 func NewOauthAuthorizeServiceImpl(clientDetailDao dao.IoauthClientDetailDao,
 	codeDao dao.IoauthCodeDao,
-	accessRefreshTokenDao dao.IAccessRefreshTokenDao) IoauthAuthorizeService {
+	accessRefreshTokenDao dao.IAccessRefreshTokenDao,
+	userDao dao.IoauthUserDao) IoauthAuthorizeService {
 	return &OauthAuthorizeServiceImpl{
 		clientDetailDao:       clientDetailDao,
 		codeDao:               codeDao,
 		accessRefreshTokenDao: accessRefreshTokenDao,
+		oauthUserDao:          userDao,
 	}
 }
 
@@ -128,6 +134,7 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 	case grantType.REFRESH:
 		return handleRefreshModel(request, authorizeService)
 	case grantType.PASSWORD:
+		return handlePassword(request, authorizeService)
 	case grantType.CLIENT:
 	default:
 		e = err.NewErr(common.NO_NSUPPORT_GRANTTYPE)
@@ -137,9 +144,65 @@ func (authorizeService *OauthAuthorizeServiceImpl) AccessToken(request *dto.Acce
 }
 
 func handlePassword(request *dto.AccessTokenReuqest,
-	client *model.OauthClientDetail,
 	authorizeService *OauthAuthorizeServiceImpl) (reponse *dto.AccessTokenRespose, e err.Err) {
-	return nil, nil
+	if request.BasicAuth == "" {
+		return nil, err.NewErr(common.AUTHORIZATION_EMPTY)
+	}
+	basicAuth := strings.Replace(request.BasicAuth, "Basic ", "", -1)
+	data, er := mybase64.Decode(basicAuth)
+	if er != nil {
+		logrus.Errorf("base64解码错误：%s", er.Error())
+		return nil, err.NewErr(common.BASE64_ERROR)
+	}
+	logrus.Infof("解码后数据：%s", data)
+	dataArr := strings.Split(data, ":")
+	if len(dataArr) != 2 {
+		return nil, err.NewErr(common.PARAMS_ERROR)
+	}
+	request.ClientId = dataArr[0]
+	request.Secret = dataArr[1]
+	client, e := authorizeService.checkClient(request)
+	if e != nil {
+		return nil, e
+	}
+	if client.ClientSecret != request.Secret {
+		return nil, err.NewErr(common.CLIENT_SECRET_ERROR)
+	}
+	userFind := authorizeService.oauthUserDao.QueryByName(request.UserName)
+	if userFind == nil {
+		return nil, err.NewErr(common.USER_NOT_EXIST)
+	}
+	if userFind.Password != mymd5.Md5(request.Password) {
+		return nil, err.NewErr(common.PASSWORD_ERROR)
+	}
+	//生成token和refreshToken,如果存在就直接删除，产生新的
+	accessTokenSave := &model.OauthAccessToken{
+		Token:     myuuid.SimpleUUID(),
+		ClientId:  client.ClientId,
+		UserId:    userFind.Id,
+		Scope:     request.Scope,
+		ExpiredAt: timeUtil.GetNowTimestamp() + int64(client.AccessTokenValidity*1000),
+	}
+	refreshTokenSave := &model.OauthRefreshToken{
+		RefreshToken: myuuid.SimpleUUID(),
+		ClientId:     client.ClientId,
+		UserId:       userFind.Id,
+		Scope:        request.Scope,
+		ExpiredAt:    timeUtil.GetNowTimestamp() + int64(client.RefreshTokenValidity*1000),
+	}
+	e = authorizeService.accessRefreshTokenDao.SaveToken(accessTokenSave, refreshTokenSave, nil)
+	if e != nil {
+		return nil, e
+	}
+	reponse = &dto.AccessTokenRespose{
+		AccessToken:  accessTokenSave.Token,
+		ExpiresIn:    client.AccessTokenValidity,
+		Scope:        request.Scope,
+		RefreshToken: refreshTokenSave.RefreshToken,
+		//openid=MD5(clientId + userId)
+		Openid: mymd5.Md5(client.ClientId + strconv.FormatInt(userFind.Id, 10)),
+	}
+	return reponse, nil
 }
 
 func handleRefreshModel(request *dto.AccessTokenReuqest,
@@ -147,6 +210,9 @@ func handleRefreshModel(request *dto.AccessTokenReuqest,
 	client, e := authorizeService.checkClient(request)
 	if e != nil {
 		return nil, e
+	}
+	if client.ClientSecret != request.Secret {
+		return nil, err.NewErr(common.CLIENT_SECRET_ERROR)
 	}
 	if request.RefreshToken == "" {
 		return nil, err.NewErr(common.REFRESH_TOKEN_EMPTY)
